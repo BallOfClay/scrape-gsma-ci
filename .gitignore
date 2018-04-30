@@ -1,3 +1,5 @@
 *.class
 *.log
-src/scala/*.sc
+.idea/*
+src/test/scala/*.sc
+src/main/resources/*

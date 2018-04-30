@@ -1,11 +1,8 @@
-import org.jsoup.Jsoup
-import scala.collection.JavaConversions._
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 
-import scala.util.matching.Regex
+val conf: Config  = ConfigFactory.load()
 
-val sesh = Jsoup.connect("https://www.gsmarena.com/makers.php3").get()
-
-val maker_nodes = sesh.select(".st-text a")
-
-maker_nodes.eachAttr("href")
-
+def printSetting(path: String) {
+  println("The setting '" + path + "' is: " + conf.getString(path))
+}

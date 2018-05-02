@@ -2,6 +2,7 @@ import org.jsoup.Jsoup
 import org.jsoup.select.Elements
 
 import scala.util.matching.Regex
+
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import doobie._
@@ -38,42 +39,45 @@ class oemTable extends sqlCon {
   }
 
 
-  def getURLs : Array[String]  = {
-    source.eachAttr("href").asScala.toArray
+  def getURLs : List[String]  = {
+    source.eachAttr("href").asScala.toList
   }
 
-  def getCounts: Array[String] = {
+  def getCounts: List[String] = {
     val rex : Regex = """(?i)((?<=\s)\d+(?= device(s)))""".r
-    source.eachText() flatMap (x => rex findFirstIn(x)) toArray
+    source.eachText() flatMap (x => rex findFirstIn(x)) toList
   }
 
-  def getOEMs: Array[String] = {
+  def getOEMs: List[String] = {
     val rex : Regex = """(?i)(.*(?= \d+ devices))""".r
-    source.eachText flatMap (x => rex findFirstIn(x)) toArray
+    source.eachText flatMap (x => rex findFirstIn(x)) toList
   }
 
 
+  val acquiredVersion: List[oemResource] = (getOEMs, getCounts.map(_.toInt), getURLs).zipped.map(oemResource)
 
-  val tmp  = {
+  val dbVersion  = {
     val a = sql"select * from gsm_resources".query[oemResource]
     a.to[List].transact(xa).unsafeRunSync()
   }
 
 
+  val cp = acquiredVersion diff dbVersion
+
+/*  def saveDiff(name, count, url) : Update0 = {
+    sql"insert into "
+  }*/
 
 }
 
 object walhalla {
   def main(args: Array[String]): Unit = {
 
-
     val oem_table = new oemTable
 
-    val oem_names = oem_table.tmp
+    val oem_names = oem_table.cp
 
-    oem_names foreach(println)
-
-    //println(oem_names)
+    println(oem_names)
 
   }
 }

@@ -3,3 +3,6 @@
 .idea
 src/test/scala/*.sc
 src/main/resources/*
+ensime.sbt
+.ensime
+.ensime_resources

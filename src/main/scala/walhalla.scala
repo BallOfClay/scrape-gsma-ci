@@ -1,20 +1,21 @@
+import java.time.ZoneOffset
+
 import org.jsoup.Jsoup
 import org.jsoup.select.Elements
 
 import scala.util.matching.Regex
-
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import doobie._
 import doobie.implicits._
-import cats._
+// import cats._
 import cats.effect._
-import cats.implicits._
+// import cats.implicits._
 
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 
-import shapeless._
+// import shapeless._
 
 
 
@@ -49,7 +50,7 @@ class oemTable extends sqlCon {
   }
 
   def getOEMs: List[String] = {
-    val rex : Regex = """(?i)(.*(?= \d+ devices))""".r
+    val rex : Regex = """(?i)(.*(?= \d+ device(s)))""".r
     source.eachText flatMap (x => rex findFirstIn(x)) toList
   }
 
@@ -62,22 +63,69 @@ class oemTable extends sqlCon {
   }
 
 
-  val cp = acquiredVersion diff dbVersion
+  val dbDiff = acquiredVersion diff dbVersion
 
-/*  def saveDiff(name, count, url) : Update0 = {
-    sql"insert into "
-  }*/
+
+
+  def insertDiff(oem: String, count: Int, location: String): Update0 = {
+
+    sql"""
+         insert into gsm_resources_diff (
+         			oem, device_count_new, url_new, device_count_old, url_old, insert_time
+         		)
+         	values(
+         		$oem, $count, $location,
+         		( select device_count from gsm_resources
+         			where gsm_resources.oem = $oem),
+         		( select location from gsm_resources
+         			where gsm_resources.oem = $oem),
+            (select current_timestamp )
+
+         	)""".update
+  }
 
 }
+
+
+class getOemPages (oemLocation: String) extends sqlCon {
+
+  private val parsedUri = "https://www.gsmarena.com/" + oemLocation
+
+  private val source : Elements  = {
+    val sesh = Jsoup.connect(parsedUri).get()
+    sesh.select(".nav-pages strong , .nav-pages a")
+  }
+
+  val pages = source.eachText()
+
+  val rex: Regex = """(?<=\-)\d+(?=.php)""".r
+
+  val gsmCode = rex findFirstIn oemLocation
+
+
+
+
+ if (source.length != 0  ) {
+
+  }
+
+
+}
+
 
 object walhalla {
   def main(args: Array[String]): Unit = {
 
     val oem_table = new oemTable
+    val oemResourcesDiff = oem_table.dbDiff
 
-    val oem_names = oem_table.cp
+    if (oemResourcesDiff.nonEmpty){
 
-    println(oem_names)
+      oemResourcesDiff foreach ( x => oem_table.insertDiff(x.name, x.count, x.location)
+       .run.transact(oem_table.xa).unsafeRunSync()
+       )
+    }
+
 
   }
 }

@@ -39,7 +39,6 @@ class oemTable extends sqlCon {
     sesh.select(".st-text a")
   }
 
-
   def getURLs : List[String]  = {
     source.eachAttr("href").asScala.toList
   }
@@ -54,7 +53,6 @@ class oemTable extends sqlCon {
     source.eachText flatMap (x => rex findFirstIn(x)) toList
   }
 
-
   val acquiredVersion: List[oemResource] = (getOEMs, getCounts.map(_.toInt), getURLs).zipped.map(oemResource)
 
   val dbVersion  = {
@@ -62,13 +60,9 @@ class oemTable extends sqlCon {
     a.to[List].transact(xa).unsafeRunSync()
   }
 
-
   val dbDiff = acquiredVersion diff dbVersion
 
-
-
   def insertDiff(oem: String, count: Int, location: String): Update0 = {
-
     sql"""
          insert into gsm_resources_diff (
          			oem, device_count_new, url_new, device_count_old, url_old, insert_time
@@ -80,35 +74,38 @@ class oemTable extends sqlCon {
          		( select location from gsm_resources
          			where gsm_resources.oem = $oem),
             (select current_timestamp )
-
          	)""".update
   }
 
 }
 
 
-class getOemPages (oemLocation: String) extends sqlCon {
+class getOemPages(oemLocation: String) {
 
-  private val parsedUri = "https://www.gsmarena.com/" + oemLocation
-
-  private val source : Elements  = {
+  val parsedUri = "https://www.gsmarena.com/" + oemLocation
+  val source : Elements  = {
     val sesh = Jsoup.connect(parsedUri).get()
     sesh.select(".nav-pages strong , .nav-pages a")
   }
 
-  val pages = source.eachText()
-
+  val pages = source.eachText() toList
   val rex: Regex = """(?<=\-)\d+(?=.php)""".r
+  val gsmCode: String = rex findFirstIn oemLocation toString
+  val gsm: String = "https://www.gsmarena.com/"
 
-  val gsmCode = rex findFirstIn oemLocation
-
-
-
-
- if (source.length != 0  ) {
-
+  def genGsmStyledUrl(oem_base: String, gsm_code: String, page_nos: List[String]) : List[String] = {
+    //strip unnecessary chars from input url, and then generate URLs according to the gsma scheme
+    val oem_title = oem_base replace("-"+gsmCode+".php", "")
+    val template: String = gsm + oem_title + "-f-" + gsm_code + "-0-p"
+    val tbr = page_nos map  (x => template + x + ".php")
+    tbr
   }
 
+ val oemPages: List[String] = if (pages.length > 1 ) {
+   genGsmStyledUrl(oemLocation, gsmCode, pages)
+  } else {
+   List(oemLocation)
+ }
 
 }
 
@@ -121,11 +118,16 @@ object walhalla {
 
     if (oemResourcesDiff.nonEmpty){
 
-      oemResourcesDiff foreach ( x => oem_table.insertDiff(x.name, x.count, x.location)
+      /*oemResourcesDiff foreach ( x => oem_table.insertDiff(x.name, x.count, x.location)
        .run.transact(oem_table.xa).unsafeRunSync()
-       )
+       )*/
+
+      val someoem = oem_table.getURLs.get(0)
+
+      val pgs = new getOemPages(someoem)
+      // println(pgs.tbr.getClass)
+      pgs.oemPages foreach println
     }
-
-
+    
   }
 }

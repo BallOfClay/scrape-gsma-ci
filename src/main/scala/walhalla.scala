@@ -88,21 +88,22 @@ class getOemPages(oemLocation: String) {
     sesh.select(".nav-pages strong , .nav-pages a")
   }
 
-  val pages = source.eachText() toList
+  val pages: List[String] = source.eachText() toList
   val rex: Regex = """(?<=\-)\d+(?=.php)""".r
-  val gsmCode: String = rex findFirstIn oemLocation toString
+  val gsmCode: String = rex findFirstIn oemLocation get
   val gsm: String = "https://www.gsmarena.com/"
+  val rex_parse: Regex = """(.*)(?=\-\d+\.php)""".r
+  val oem_title: String = rex_parse findFirstIn oemLocation get
 
-  def genGsmStyledUrl(oem_base: String, gsm_code: String, page_nos: List[String]) : List[String] = {
+  def genGsmStyledUrl(page_nos: List[String]) : List[String] = {
     //strip unnecessary chars from input url, and then generate URLs according to the gsma scheme
-    val oem_title = oem_base replace("-"+gsmCode+".php", "")
-    val template: String = gsm + oem_title + "-f-" + gsm_code + "-0-p"
+    val template: String = gsm + oem_title + "-f-" + gsmCode + "-0-p"
     val tbr = page_nos map  (x => template + x + ".php")
     tbr
   }
 
  val oemPages: List[String] = if (pages.length > 1 ) {
-   genGsmStyledUrl(oemLocation, gsmCode, pages)
+   genGsmStyledUrl( pages)
   } else {
    List(oemLocation)
  }
@@ -118,16 +119,16 @@ object walhalla {
 
     if (oemResourcesDiff.nonEmpty){
 
-      /*oemResourcesDiff foreach ( x => oem_table.insertDiff(x.name, x.count, x.location)
+      oemResourcesDiff foreach ( x => oem_table.insertDiff(x.name, x.count, x.location)
        .run.transact(oem_table.xa).unsafeRunSync()
-       )*/
+       )
 
       val someoem = oem_table.getURLs.get(0)
 
       val pgs = new getOemPages(someoem)
-      // println(pgs.tbr.getClass)
+
       pgs.oemPages foreach println
     }
-    
+
   }
 }
